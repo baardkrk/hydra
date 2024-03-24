@@ -1,0 +1,40 @@
+---
+- name: Setup Head Node
+  hosts: head-node
+  vars:
+    switch_mac: ''
+    compute_nodes: [] # { mac: ???, serial: ??? }
+  tasks:
+    - name: Set static IP on Home LAN.
+      become: true
+      community.general.nmcli:
+        type: ethernet
+        ifname: eth1
+        conn_name: Home LAN
+        ip4: 10.13.37.101/24
+        gw4: 10.13.37.1
+        dns4: [ "8.8.8.8", "8.8.4.4" ]
+        autoconnect: true
+        state: present
+
+    - name: Allocate address space for internal cluster.
+      become: true
+      community.general.nmcli:
+        type: ethernet
+        ifname: eth0
+        conn_name: Cluster Connection
+        ip4: 192.168.50.1/24
+        method4: manual
+        state: present
+
+    - name: Ethernet adapter workaround.
+      ansible.builtin.include_role:
+        name: rtl8153-workaround
+
+    - name: Set up DHCP server.
+      ansible.builtin.include_role:
+        name: dhcp-server
+
+    - name: Set up shared filesystem.
+      ansible.builtin.include_role:
+        name: filesystem

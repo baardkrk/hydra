@@ -1,0 +1,86 @@
+* ClusterFuck
+This repository contains the configuration/setup/notes for my raspberry pi
+cluster. I've used the following [[https://www.raspberrypi.com/tutorials/cluster-raspberry-pi-tutorial/][tutorial]] to set it up, but will provide some
+notes here in case of link-rot.
+
+** Setup host
+The goal is that all the setup should be done by Ansible as far as possible. To
+set up Ansible  on my machine, I've taken the following steps:
+
+#+begin_src shell-script
+  UBUNTU_CODENAME=jammy
+  wget -O- \
+       "https://keyserver.ubuntu.com/pks/lookup?fingerprint=on&op=get&search=0x6125E2A8C77F2818FB7BD15B93C4A3FD7BB9C367" | \
+       sudo gpg --dearmour -o /usr/share/keyrings/ansible-archive-keyring.gpg
+  echo "deb [signed-by=/usr/share/keyrings/ansible-archive-keyring.gpg] http://ppa.launchpad.net/ansible/ansible/ubuntu ${UBUNTU_CODENAME} main" | \
+      sudo tee /etc/apt/sources.list.d/ansible.list
+  sudo apt update && sudo apt install ansible
+#+end_src
+
+We'll also need a public SSH-key which we can get like the example below. The
+public key will in this case be the contents of ~$HOME/.ssh/id_ed25519.pub~.
+
+#+begin_src shell-script
+  ssh-keygen -t ed25519
+#+end_src
+
+** Hardware
+I'm setting up two RPI4's with four gigabytes of memory and two with eight.
+They're all powered by a [[https://www.tp-link.com/no/support/download/tl-sg105pe/v2/][TL-SG105PE V2]] PoE switch, and the PIs are housed in a
+cluster-case from UCTRONICS. The head node also has the fan from the case
+connected via a USB port. I'm using a [[https://www.samsung.com/us/computing/memory-storage/solid-state-drives/870-evo-sata-2-5-ssd-500gb-mz-77e500b-am/][Samsung 870 EVO SSD-disk 500 GB]] disk for
+storage. I also used a USB 3.0 to Gigabit Ethernet adapter from [[https://www.kjell.com/no/produkter/nettverk/kablet-nettverk/nettverkskort-for-kablet-nettverk/plexgear-gigabit-nettverkskort-1-gbs-svart-p69087][plexgear]].
+
+** Head Node
+The head node is configured according to the tutorial. I flashed the Micro-SD
+card using the =rpi-imager= program, with =Raspberry Pi OS Lite (64-bit)=. I
+added the options for only public key authentication for SSH and my public SSH
+key. I also set the hostname to be =clusterfuck=. 
+
+I didn't configure the wifi connection, as I figured we would connect to it
+using the USB ethernet connection anyway.
+
+Now we can connect the raspberry to one of the ports of the switch to power it
+up, and it should be available on the LAN. We can then go ahead and run the
+Ansible playbook for the head node:
+
+#+begin_src shell-script
+  cd playbooks
+  ansible-playbook -i inventory.ini --limit head-node setup-head-node.yaml
+#+end_src
+
+Currently, the head node uses a template when it's creating its DHCP config.
+This means that if this play is run after having initialized the compute nodes,
+we will have to enroll them again since they will be modifying the same file(s).
+
+*** TODO Modifying the DHCP config
+Until I find a better solution, this will remain a todo item. Currently I just
+found the MAC address of the switch by running ~dhcp-lease-list~ on the head
+node. I then modified the DHCP config to now include the switch MAC and give it
+a static IP.
+
+** Shared Disk
+This disk is used to host the partitions for the rest of the compute nodes. With
+me ssh'ed- and the harddisk plugged into the head node, we can run the following
+commands. This could be done from any computer though, so that's why it won't be
+in the ansible playbook.
+
+#+begin_src shell-script
+  sudo parted -s /dev/sda mklabel gpt
+  sudo parted --a optimal /dev/sda mkpart primary ext4 0% 100%
+  sudo mkfs -t ext4 /dev/sda1
+#+end_src
+
+We then need to mount the disk. This is in the ansible play for the head node,
+but we can make sure manually as well:
+
+#+begin_src shell-script
+  sudo mkdir /mnt/usb
+  sudo mount /dev/sda1 /mnt/usb
+  sudo systemctl daemon-reload
+#+end_src
+
+** Compute Nodes
+We want the compute nodes to be able to network boot from our head node. For the
+Raspberry Pi 4, we have to boot a single time from an SD card to configure the
+boot order using ~raspi-config~.

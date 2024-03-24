@@ -1,0 +1,41 @@
+# Workaround for getting the adapter to work.
+# After finding out it was changing ID on boot vs when it gets plugged in,
+# it was possible to find an answer at:
+# https://io.24hoursmedia.com/tech-notes/help-my-rpi4-thinks-my-usb-ethernet-is-a-storage-device
+# 
+# The device IDs for future reference:
+# Bus 002 Device 003: ID 0bda:8151 Realtek Semiconductor Corp. RTL8151 Adapteon Business Mobile Networks BV
+# Bus 002 Device 004: ID 0bda:8153 Realtek Semiconductor Corp. RTL8153 Gigabit Ethernet Adapter
+---
+
+- name: Install dependencies.
+  become: true
+  ansible.builtin.apt:
+    name: usb-modeswitch
+    state: present
+
+- name: Ensure service file exists.
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/r8153-ethernet-adapter-fix.service
+    content: |
+      [Unit]
+      Description=Forces ethernet adapter R8153 to register as what it is
+      
+      [Service]
+      ExecStart=/usr/sbin/usb_modeswitch -v 0bda -p 8151 -R
+      Type=oneshot
+      RemainAfterExit=yes
+
+      [Install]
+      WantedBy=multi-user.target
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Enable the service.
+  become: true
+  ansible.builtin.systemd_service:
+    name: r8153-ethernet-adapter-fix
+    enabled: true
+    state: started

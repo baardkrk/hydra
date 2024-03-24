@@ -1,0 +1,50 @@
+# TODO: This needs to have better defaults/way of handling the IP addresses.
+
+ddns-update-style none;
+authoritative;
+log-facility local7;
+
+# No service will be given on this subnet
+subnet 10.13.37.0 netmask 255.255.255.0 {
+}
+
+# The internal cluster network
+group {
+      option broadcast-address {{ cluster_network_portion }}.255;
+      option routers {{ cluster_network_portion }}.1;
+      default-lease-time 600;
+      max-lease-time 7200;
+      option domain-name "cluster";
+      option domain-name-servers 8.8.8.8, 8.8.4.4;
+      subnet {{ cluster_network_portion }}.0 netmask 255.255.255.0 {
+             range {{ cluster_network_portion }}.20 {{ cluster_network_portion }}.250;
+
+             # Head Node
+             host cluster {
+                  hardware ethernet {{ ansible_facts.eth0.macaddress }};
+                  fixed-address {{ cluster_network_portion }}.1;
+             }
+             
+             {% if switch_mac is defined -%}
+             # Switch
+             host switch {
+                  hardware ethernet {{ switch_mac }};
+                  fixed-address {{ cluster_network_portion }}.254;
+             }
+             {% endif %}
+
+             {% for node in compute_nodes -%}
+             # Node {{ loop.index }}
+             host rpi{{ loop.index }} {
+                  option root-path "/mnt/usb/tftpboot/";
+                  hardware ethernet {{node.mac}};
+                  option option-43 "Raspberry Pi Boot";
+                  option option-66 "{{ cluster_network_portion }}.1";
+                  next-server {{ cluster_network_portion }}.1;
+                  fixed-address {{ cluster_network_portion }}.1{{ loop.index }};
+                  option host-name "rpi{{ loop.index }}";
+             }
+             {% endfor %}
+
+      }
+}

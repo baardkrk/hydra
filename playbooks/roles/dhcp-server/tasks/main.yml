@@ -1,0 +1,29 @@
+# Configure a DHCP server.
+# This will automatically use 8.8.8.8/8.8.4.4 as DNS servers.
+# The local-network variable will set the "no-service" subnet
+# Will look for the host ethernet address 
+---
+
+- name: DHCP server program is present.
+  become: true
+  ansible.builtin.apt:
+    name: isc-dhcp-server
+    state: present
+    
+- name: Set DHCP configuration file.
+  become: true
+  ansible.builtin.template:
+    src: dhcpd.conf.j2
+    dest: /etc/dhcp/dhcpd.conf
+
+- name: Set DHCP server file.
+  become: true
+  ansible.builtin.copy:
+    src: isc-dhcp-server
+    dest: /etc/default/isc-dhcp-server
+
+- name: Set the hosts file.
+  become: true
+  ansible.builtin.copy:
+    src: hosts
+    dest: /etc/hosts

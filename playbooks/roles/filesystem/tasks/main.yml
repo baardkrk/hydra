@@ -1,0 +1,55 @@
+---
+# TODO: This role also suffers from the ugly "network portion" handling.
+
+- name: Make sure the SSD is mounted.
+  become: true
+  ansible.posix.mount:
+    path: /mnt/usb
+    src: /dev/sda1
+    fstype: ext4
+    opts: defaults,user
+    passno: 1
+    state: mounted
+
+- name: NFS server program is present.
+  become: true
+  ansible.builtin.apt:
+    name: nfs-kernel-server
+    state: present
+    
+- name: Ensure a shaerable mount point.
+  become: true
+  ansible.builtin.file:
+    path: /mnt/usb/scratch
+    owner: '{{ ansible_user_id }}'
+    group: '{{ ansible_user_id }}'
+    state: directory
+
+- name: Convenience link for mounted drive.
+  become: true
+  ansible.builtin.file:
+    path: /scratch
+    src: /mnt/usb/scratch
+    state: link
+
+- name: Make shared drive available on network.
+  become: true
+  ansible.builtin.lineinfile:
+    path: /etc/exports
+    create: true
+    regexp: '^/mnt/usb/scratch'
+    line: '/mnt/usb/scratch {{ cluster_network_portion }}.0/24(rw,sync)'
+
+- name: Enable and start RPC bind.
+  become: true
+  ansible.builtin.systemd_service:
+    name: rpcbind
+    enabled: true
+    state: started
+
+- name: Enable and start NFS server.
+  become: true
+  ansible.builtin.systemd_service:
+    name: nfs-server
+    enabled: true
+    state: started

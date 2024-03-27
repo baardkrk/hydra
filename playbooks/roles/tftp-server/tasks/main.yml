@@ -1,0 +1,39 @@
+# Setting up a boot server
+
+---
+- name: Install prerequisites.
+  become: true
+  ansible.builtin.apt:
+    name: [ tftpd-hpa, kpartx ]
+    state: present
+
+- name: Make sure the SSD is mounted.
+  become: true
+  ansible.posix.mount:
+    path: /mnt/usb
+    src: /dev/sda1
+    fstype: ext4
+    opts: defaults,user
+    passno: 1
+    state: mounted
+
+- name: Add TFTP boot directory.
+  become: true
+  ansible.builtin.file:
+    path: /mnt/usb/tftpboot
+    owner: tftp
+    group: tftp
+    state: directory
+
+- name: Make configuration file.
+  become: true
+  ansible.builtin.copy:
+    src: tftpd-hpa
+    dest: /etc/default/tftpd-hpa
+
+- name: Restart and enable service.
+  become: true
+  ansible.builtin.systemd_service:
+    name: tftpd-hpa
+    enabled: true
+    state: restarted

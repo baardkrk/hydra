@@ -1,0 +1,50 @@
+---
+- name: Copy downloaded files.
+  when: download_firmware
+  block:
+    - name: Copy rootfs to compute filesystems.
+      become: true
+      ansible.builtin.copy:
+        remote_src: true
+        src: /tmp/image/rootmnt
+        dest: "/mnt/usb/{{ item.hostname }}"
+    
+    - name: Copy firmware to compute filesystems.
+      become: true
+      ansible.builtin.copy:
+        remote_src: true
+        src: /tmp/image/bootmnt
+        dest: "/mnt/usb/{{ item.hostname }}/boot/firmware"
+
+- name: Create tftpboot directory.
+  become: true
+  ansible.builtin.file:
+    dest: "/mnt/usb/tftpboot/{{ item.serial }}"
+    state: directory
+
+- name: Configure fstab.
+  become: true
+  ansible.builtin.lineinfile:
+    path: "/mnt/usb/{{ item.hostname }}/etc/fstab"
+    line: "{{ cluster_network_portion }}.1:/mnt/usb/tftpboot/{{ item.serial }} /boot/firmware nfs defaults,vers=3 0 0"
+    create: true
+
+- name: Pass arguments to the Linux kernel.
+  become: true
+  ansible.builtin.copy:
+    dest: "/mnt/usb/{{ item.hostname }}/boot/firmware/cmdline.txt"
+    content: "console=serial0,115200 console=tty root=/dev/nfs nfsroot={{ cluster_network_portion }}.1:/mnt/usb/{{ item.hostname }},vers=3 rw ip=dhcp rootwait"
+
+- name: Make sure `.ssh` directory exists
+  become: true
+  ansible.builtin.file:
+    dest: "/mnt/usb/{{ item.hostname }}/home/{{ ansible_user_id }}/.ssh"
+    state: directory
+    mode: "0700"
+
+- name: Add ssh key(s).
+  become: true
+  ansible.builtin.copy:
+    dest: "/mnt/usb/{{ item.hostname }}/home/{{ ansible_user_id }}/.ssh/authorized_keys"
+    src: authorized_keys
+    mode: "0600"

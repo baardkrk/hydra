@@ -2,8 +2,11 @@
 - name: Setup Head Node
   hosts: head-node
   vars:
+    cluster_network_portion: 192.168.50
     switch_mac: ''
-    compute_nodes: [] # { mac: ???, serial: ??? }
+    update_firmware: true
+    compute_nodes: [] 
+
   tasks:
     - name: Set static IP on Home LAN.
       become: true
@@ -31,6 +34,9 @@
       ansible.builtin.include_role:
         name: rtl8153-workaround
 
+    - name: Make sure workaround is applied.
+      ansible.builtin.meta: flush_handlers
+
     - name: Set up DHCP server.
       ansible.builtin.include_role:
         name: dhcp-server
@@ -38,3 +44,11 @@
     - name: Set up shared filesystem.
       ansible.builtin.include_role:
         name: filesystem
+    
+    - name: Set up TFTP service on filesystem.
+      ansible.builtin.include_role:
+        name: tftp-server
+
+    - name: Enroll compute nodes to filesystem.
+      ansible.builtin.include_role:
+        name: enroll-compute-nodes

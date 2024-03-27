@@ -1,0 +1,20 @@
+- name: cleanup apt
+  ansible.builtin.apt:
+    name: kpartx
+    state: absent
+
+- name: unmount workspace
+  ansible.posix.mount:
+    path: "/tmp/image/{{ item.dest }}"
+    src: "/dev/mapper/{{ item.src }}"
+    state: unmounted
+  loop:
+    - dest: bootmnt
+      src: loop0p1
+    - dest: rootmnt
+      src: loop0p2
+
+- name: cleanup workspace
+  ansible.builtin.file:
+    path: "/tmp/image"
+    state: absent

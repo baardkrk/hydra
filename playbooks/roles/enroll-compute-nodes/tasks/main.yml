@@ -1,0 +1,73 @@
+# Download the latest firmware, and create the filesystems for the compute nodes
+# Note that the download will _always_ run because of the cleanup process.
+---
+- name: Download and mount new firmware and fs.
+  when: update_firmware|bool
+  block:
+    - name: Install prerequisites.
+      become: true
+      ansible.builtin.apt:
+        name: kpartx
+        state: present
+      notify: cleanup apt
+    
+    - name: Create temporary workspace.
+      become: true
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+      loop: 
+        - /tmp/image/bootmnt
+        - /tmp/image/rootmnt
+      notify: 
+        - unmount workspace
+        - cleanup workspace
+
+    - name: Test DNS resolution
+      ansible.builtin.get_url:
+        url: https://icanhazip.com/
+        dest: /tmp/test_dns.txt
+    - name: Print output
+      ansible.builtin.command: cat /tmp/test_dns.txt
+      register: debug_output
+    - name: Check output
+      debug: 
+        msg: "IP from icanhazip: {{ debug_output.stdout }}"
+
+
+    - name: Download latest firmware.
+      become: true
+      ansible.builtin.get_url:
+        url: https://downloads.raspberrypi.com/raspios_lite_arm64_latest
+        dest: /tmp/image/raspios_lite_latest.img.xz
+      notify: 
+        - unmount workspace
+        - cleanup workspace
+    
+    - name: Unpack the downloaded firmware.
+      become: true
+      ansible.builtin.shell: >-
+        xz -d /tmp/image/raspios_lite_latest.img.xz
+        kpartx -a -v /tmp/image/*.img
+      notify: 
+        - unmount workspace
+        - cleanup workspace
+        
+    - name: Temporarily mount the downloaded firmware and filesystem.
+      become: true
+      ansible.posix.mount:
+        path: "/tmp/image/{{ item.dest }}"
+        src: "/dev/mapper/{{ item.src }}"
+        state: mounted
+      loop:
+        - dest: bootmnt
+          src: loop0p1
+        - dest: rootmnt
+          src: loop0p2
+      notify: 
+        - unmount workspace
+        - cleanup workspace
+
+- name: Configure node filesystem
+  include_tasks: create_filesystems.yml
+  loop: "{{ compute_nodes }}"

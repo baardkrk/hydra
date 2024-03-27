@@ -1,4 +1,4 @@
-* ClusterFuck
+* Hydra
 This repository contains the configuration/setup/notes for my raspberry pi
 cluster. I've used the following [[https://www.raspberrypi.com/tutorials/cluster-raspberry-pi-tutorial/][tutorial]] to set it up, but will provide some
 notes here in case of link-rot.
@@ -35,7 +35,7 @@ storage. I also used a USB 3.0 to Gigabit Ethernet adapter from [[https://www.kj
 The head node is configured according to the tutorial. I flashed the Micro-SD
 card using the =rpi-imager= program, with =Raspberry Pi OS Lite (64-bit)=. I
 added the options for only public key authentication for SSH and my public SSH
-key. I also set the hostname to be =clusterfuck=. 
+key. I also set the hostname to be =hydra=. 
 
 I didn't configure the wifi connection, as I figured we would connect to it
 using the USB ethernet connection anyway.
@@ -84,3 +84,57 @@ but we can make sure manually as well:
 We want the compute nodes to be able to network boot from our head node. For the
 Raspberry Pi 4, we have to boot a single time from an SD card to configure the
 boot order using ~raspi-config~.
+
+I flashed an SD card with Raspberry PI OS Lite 64-bit again, just changing out
+the password for the user account, and setting the hostname to =compute-01=. 
+
+To be able to SSH to the compute node from the head node, I also had to add the
+following to my =~/.ssh/config= file:
+
+#+begin_src
+Host hydra.local
+  ForwardAgent yes
+#+end_src
+
+Another way to accomplish this is with the following command, which will add the
+compute node to your =known_hosts= file:
+
+#+begin_src shell-script
+ssh -o ProxyCommand="ssh -W %h:%p -q bard@hydra.local" compute-01.local
+#+end_src
+
+Now, SSH-ing via the head node, we grab the IP of the compute node using
+~dhcp-lease-list~. Then, we SSH to this IP, and run ~sudo raspi-config~. For the
+configuration, we choose alternatives =6 Advanced Options= > =A4 Boot Order= >
+=B3 Network Boot=. This will now configure the EEPROM bootloader on the next
+reboot. 
+
+After the node have rebooted, we check the configuration:
+
+#+begin_src shell-script
+$ vcgencmd bootloader_config
+[all]
+BOOT_UART=0
+WAKE_ON_GPIO=1
+POWER_OFF_ON_HALT=0
+
+[all]
+BOOT_ORDER=0xf21
+#+end_src
+
+after this, we can run the =compute-node-info= play. I had to add the
+certificate to my =known_hosts= file, so it isn't entirely unattended. (Unless
+you used the SSH proxy command instead of forwarding the agent). Then, I grabbed
+the output from that play, and stored in a scratch buffer or somewhere temporary.
+
+Using the /same, unmodified SD card/ we do this for the rest of the compute
+nodes, just modifying the hostname of the output for each. We'll use this to
+build our inventory later.
+
+* TODO Define interaciton surface
+I need to clean this up and create a good interaction surface for this
+repository. Some of the offending paths are:
+
++ Temporary workspace: =/tmp/image=
++ Cluster network, per now using ~cluster_network_portion~, but then hard-coding
+  the resulting host portion of the IP addresses. (And mask)

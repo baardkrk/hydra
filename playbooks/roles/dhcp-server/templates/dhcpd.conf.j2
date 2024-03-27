@@ -37,12 +37,12 @@ group {
              # Node {{ loop.index }}
              host rpi{{ loop.index }} {
                   option root-path "/mnt/usb/tftpboot/";
-                  hardware ethernet {{node.mac}};
+                  hardware ethernet {{ node.mac }};
                   option option-43 "Raspberry Pi Boot";
                   option option-66 "{{ cluster_network_portion }}.1";
                   next-server {{ cluster_network_portion }}.1;
                   fixed-address {{ cluster_network_portion }}.1{{ loop.index }};
-                  option host-name "rpi{{ loop.index }}";
+                  option host-name "{{ node.hostname }}";
              }
              {% endfor %}
 

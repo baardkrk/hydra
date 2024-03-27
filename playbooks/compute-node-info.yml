@@ -1,0 +1,21 @@
+---
+- name: Aquire compute node info
+  hosts: compute-nodes
+  vars:
+    output_file: '/tmp/compute-node.txt'
+  tasks:
+    - name: Get serial number for raspberry pi.
+      ansible.builtin.shell: >-
+        grep Serial /proc/cpuinfo | cut -d ' ' -f 2 | cut -c 9-16
+      register: serial_number
+
+    - name: Write info to local file.
+      delegate_to: localhost
+      ansible.builtin.copy:
+        content: |
+          { 
+            "hostname": "{{ ansible_facts.hostname }}",
+            "mac": "{{ ansible_facts.eth0.macaddress }}",
+            "serial": "{{ serial_number.stdout }}"
+          },
+        dest: "{{ output_file }}"

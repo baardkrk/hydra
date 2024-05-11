@@ -1,3 +1,4 @@
+# This role sets up the filesystem 
 ---
 # TODO: This role also suffers from the ugly "network portion" handling.
 
@@ -21,8 +22,8 @@
   become: true
   ansible.builtin.file:
     path: /mnt/usb/scratch
-    owner: '{{ ansible_user_id }}'
-    group: '{{ ansible_user_id }}'
+    owner: "{{ ansible_user_id }}"
+    group: "{{ ansible_user_id }}"
     state: directory
 
 - name: Convenience link for mounted drive.

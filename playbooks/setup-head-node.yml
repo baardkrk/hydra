@@ -1,11 +1,6 @@
 ---
 - name: Setup Head Node
-  hosts: head-node
-  vars:
-    cluster_network_portion: 192.168.50
-    switch_mac: ''
-    update_firmware: true
-    compute_nodes: [] 
+  hosts: head_node
 
   tasks:
     - name: Set static IP on Home LAN.
@@ -26,20 +21,26 @@
         type: ethernet
         ifname: eth0
         conn_name: Cluster Connection
-        ip4: 192.168.50.1/24
+        ip4: "{{ cluster_network_portion }}.1/24"
         method4: manual
         state: present
 
-    - name: Ethernet adapter workaround.
-      ansible.builtin.include_role:
-        name: rtl8153-workaround
-
-    - name: Make sure workaround is applied.
-      ansible.builtin.meta: flush_handlers
+    - name: Copy default sshd_config file.
+      become: true
+      ansible.builtin.copy:
+        dest: "/etc/ssh/sshd_config"
+        src: head_node_sshd_config
+        owner: root
+        group: root
+        mode: "644"
 
     - name: Set up DHCP server.
       ansible.builtin.include_role:
         name: dhcp-server
+
+    - name: Apply R8153 ethernet adapter workaround.
+      ansible.builtin.include_role:
+        name: rtl8153-workaround
 
     - name: Set up shared filesystem.
       ansible.builtin.include_role:

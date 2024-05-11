@@ -4,7 +4,7 @@
 - name: Install prerequisites.
   become: true
   ansible.builtin.apt:
-    name: [ tftpd-hpa, kpartx ]
+    name: [ tftpd-hpa ]
     state: present
 
 - name: Make sure the SSD is mounted.

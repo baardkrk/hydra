@@ -1,0 +1,38 @@
+# Fan control
+# A simple service for controlling the fan at the back of the cluster to reduce 
+# noise and power consumption.
+
+# NB! This did not work, as it could target ports individually, but it couldn't 
+# actually turn power off for them it seems
+
+---
+# - name: Install prerequisites.
+#   become: true
+#   ansible.builtin.apt:
+#     name: uhubctl
+#     state: present
+
+# - name: Ensure fan control program exists.
+#   become: true
+#   ansible.builtin.copy:
+#     src: files/fan-control.sh
+#     dest: /usr/local/bin/fan-control.sh
+#     owner: root
+#     group: root
+#     mode: '0644'
+
+# - name: Ensure fan control service exists.
+#   become: true
+#   ansible.builtin.copy:
+#     src: files/fan-control.sh
+#     dest: /etc/systemd/system/fan-control.service
+#     owner: root
+#     group: root
+#     mode: '0644'
+
+# - name: Enable the service.
+#   become: true
+#   ansible.builtin.systemd_service:
+#     name: fan-control
+#     enabled: true
+#     state: started

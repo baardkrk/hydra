@@ -1,0 +1,73 @@
+* The Ethernet Adapter Adventure
+
+This is a bit of a sidetrack, and is mostly something I'm writing from memory
+and uncommitted fragments from this codebase. However, I wanted to record the
+misadventure instead of just not committing any of it and forgetting it.
+
+So, I had purchased a USB 3.0 to Gigabit Ethernet adapter from [[https://www.kjell.com/no/produkter/nettverk/kablet-nettverk/nettverkskort-for-kablet-nettverk/plexgear-gigabit-nettverkskort-1-gbs-svart-p69087][plexgear]]
+to provide an extra ethernet port for the head node of this project. However, it
+turned out that this adapter was a bit too smart for its own good. For some
+reason, it /changed device ID/ whenever any kind of load was placed on it. Coupled
+with the Raspberry Pi insisting on reading it as a storage device on boot, this
+was quite a problem to untangle.
+
+First, I had to create a task for making sure that the Raspberry Pi was
+registering the ethernet adapter correctly. This was done with the
+=rtl8153-workaround= role that's still in this repository. The solution was found
+at [[https://io.24hoursmedia.com/tech-notes/help-my-rpi4-thinks-my-usb-ethernet-is-a-storage-device][24hoursmedia]], which is credited in the role.
+
+Some more steps that were taken to mitigate the previous was the following task,
+which have later been removed:
+
+#+begin_src yaml
+  - name: Create the udev rule for the Ethernet adapter
+    become: true
+    ansible.builtin.copy:
+      dest: /etc/udev/rules.d/99-r8153-ethernet-fix.rules
+      content: |
+        ACTION=="add", SUBSYSTEM=="usb", ATTRS{idVendor}=="0bda", ATTRS{idProduct}=="8151", TAG+="systemd", ENV{SYSTEMD_WANTS}+="r8153-ethernet-adapter-fix.service"
+      owner: root
+      group: root
+      mode: '0644'
+      notify: reload udev rules
+#+end_src
+
+
+Now, the next bug was that the ethernet adapter changed its device ID whenever
+it was placed under any kind of load. The device IDs it changed between were the
+following:
+
+ + =Bus 002 Device 003: ID 0bda:8151 Realtek Semiconductor Corp. RTL8151 Adapteon
+   Business Mobile Networks BV=
+ + =Bus 002 Device 004: ID 0bda:8153 Realtek Semiconductor Corp. RTL8153 Gigabit
+   Ethernet Adapter=
+
+I tried to mitigate this by blacklisting the device ID with the following tasks,
+but to no avail:
+
+#+begin_src yaml
+  - name: Install TLP
+    become: true
+    ansible.builtin.apt: 
+      name: tlp
+      state: present
+
+  - name: Add to blacklist
+    become: true
+    ansible.builtin.lineinfile:
+      path: /etc/default/tlp
+      create: true
+      regexp: '^USB_BLACKLIST='
+      line: USB_BLACKLIST=0bda:8153
+
+  - name: Add kernel boot options
+    become: true
+    ansible.builtin.lineinfile:
+      path: /boot/firmware/config.txt
+      regexp: '^usbcore.quirks='
+      line: usbcore.quirks=0bda:8153:bjkm
+    notify: reboot
+#+end_src
+ 
+I also found some other people at the [[https://bugzilla.kernel.org/show_bug.cgi?id=198931][Linux kernel forums]] at which point I
+decided to give up on the adapter, and change it for a different one.

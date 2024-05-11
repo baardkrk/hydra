@@ -2,10 +2,6 @@
 # After finding out it was changing ID on boot vs when it gets plugged in,
 # it was possible to find an answer at:
 # https://io.24hoursmedia.com/tech-notes/help-my-rpi4-thinks-my-usb-ethernet-is-a-storage-device
-# 
-# The device IDs for future reference:
-# Bus 002 Device 003: ID 0bda:8151 Realtek Semiconductor Corp. RTL8151 Adapteon Business Mobile Networks BV
-# Bus 002 Device 004: ID 0bda:8153 Realtek Semiconductor Corp. RTL8153 Gigabit Ethernet Adapter
 ---
 
 - name: Install dependencies.
@@ -32,6 +28,7 @@
     owner: root
     group: root
     mode: '0644'
+  notify: reload service
 
 - name: Enable the service.
   become: true

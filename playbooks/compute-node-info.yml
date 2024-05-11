@@ -1,8 +1,16 @@
 ---
 - name: Aquire compute node info
   hosts: compute-nodes
+  gather_facts: false
+
   vars:
     output_file: '/tmp/compute-node.txt'
+
+  pre_tasks:
+    - ansible.builtin.setup:
+        gather_subset:
+          - 'network'
+
   tasks:
     - name: Get serial number for raspberry pi.
       ansible.builtin.shell: >-

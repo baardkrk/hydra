@@ -1,20 +1,26 @@
 - name: cleanup apt
+  become: true
   ansible.builtin.apt:
     name: kpartx
     state: absent
 
 - name: unmount workspace
+  become: true
   ansible.posix.mount:
     path: "/tmp/image/{{ item.dest }}"
     src: "/dev/mapper/{{ item.src }}"
-    state: unmounted
+    fstype: "{{ item.fstype }}"
+    state: absent
   loop:
     - dest: bootmnt
       src: loop0p1
+      fstype: vfat
     - dest: rootmnt
       src: loop0p2
+      fstype: ext4
 
 - name: cleanup workspace
+  become: true
   ansible.builtin.file:
     path: "/tmp/image"
     state: absent

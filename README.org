@@ -29,7 +29,12 @@ I'm setting up two RPI4's with four gigabytes of memory and two with eight.
 They're all powered by a [[https://www.tp-link.com/no/support/download/tl-sg105pe/v2/][TL-SG105PE V2]] PoE switch, and the PIs are housed in a
 cluster-case from UCTRONICS. The head node also has the fan from the case
 connected via a USB port. I'm using a [[https://www.samsung.com/us/computing/memory-storage/solid-state-drives/870-evo-sata-2-5-ssd-500gb-mz-77e500b-am/][Samsung 870 EVO SSD-disk 500 GB]] disk for
-storage. I also used a USB 3.0 to Gigabit Ethernet adapter from [[https://www.kjell.com/no/produkter/nettverk/kablet-nettverk/nettverkskort-for-kablet-nettverk/plexgear-gigabit-nettverkskort-1-gbs-svart-p69087][plexgear]].
+storage. 
+
+*** Plexgear
+I tried using a USB 3.0 to Gigabit Ethernet adapter from [[https://www.kjell.com/no/produkter/nettverk/kablet-nettverk/nettverkskort-for-kablet-nettverk/plexgear-gigabit-nettverkskort-1-gbs-svart-p69087][plexgear]]. However, due
+to troubles with the device switching usb-mode when under load, I had to
+reconsider and used a different adapter.
 
 ** Head Node
 The head node is configured according to the tutorial. I flashed the Micro-SD
@@ -91,9 +96,9 @@ the password for the user account, and setting the hostname to =compute-01=.
 To be able to SSH to the compute node from the head node, I also had to add the
 following to my =~/.ssh/config= file:
 
-#+begin_src
-Host hydra.local
-  ForwardAgent yes
+#+begin_src conf
+  Host hydra.local
+       ForwardAgent yes
 #+end_src
 
 Another way to accomplish this is with the following command, which will add the
@@ -131,6 +136,24 @@ Using the /same, unmodified SD card/ we do this for the rest of the compute
 nodes, just modifying the hostname of the output for each. We'll use this to
 build our inventory later.
 
+*** Running Ansible roles on the compute nodes
+By adding a /"bastion host"/ or /"SSH proxy"/ to the SSH configuration, we can
+access hostnames on the subnet created by the DHCP server on the head node.
+We can accomplish this by adding the following to the =~/.ssh/config= file:
+
+#+begin_src conf
+  Host 192.168.50.*
+       ProxyJump hydra.local
+#+end_src
+
+Where =192.168.50.*= is the /network portion/ of the subnet managed by the head
+node, and =hydra.local= is the hostname of the head node on your local network.
+
+* Important note
+This setup /will not work/ for configurations that has ten or more compute nodes.
+This is because of the way the IP addresses are configured in the [[file:playbooks/roles/dhcp-server/templates/dhcpd.conf.j2][DHCP server
+configuration]] and in the [[file:playbooks/roles/enroll-compute-nodes/templates/hosts.j2][hosts file]] for the nodes.
+
 * TODO Define interaciton surface
 I need to clean this up and create a good interaction surface for this
 repository. Some of the offending paths are:
@@ -138,3 +161,15 @@ repository. Some of the offending paths are:
 + Temporary workspace: =/tmp/image=
 + Cluster network, per now using ~cluster_network_portion~, but then hard-coding
   the resulting host portion of the IP addresses. (And mask)
+
+* TODO Migrate DHCP server
+ISC DHCP is deprecated, and should be migrated to Kea DHCP server. There is a
+[[https://dhcp.isc.org/][migration tool]] for translating the config file, and a [[https://kea.readthedocs.io/en/latest/index.html][documentation page]] for
+further migration resources.
+
+* TODO Rewrite to use compute node hosts
+Currently a variable list of objects called ~compute_nodes~ is used to keep track
+of the MAC address and serial number for the compute nodes. However, it would be
+better to just define the compute nodes under a heading that can be accessed by
+the ~hosts~ key in ansible playbooks. Now, the compute nodes will have to be
+defined both in the variable list /and/ as separate hosts.

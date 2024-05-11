@@ -9,6 +9,10 @@
 # /srv/nfs4/homes  gss/krb5i(rw,sync,no_subtree_check)
 #
 /mnt/usb/scratch {{ cluster_network_portion }}.0/24(rw,sync)
+# TODO: There might be a misconfiguration from the tutorial here, as this is not
+# included. Might want to configure the compute nodes to mount a different
+# boot directory in the future.
+/mnt/usb/tftpboot {{ cluster_network_portion }}.0/24(rw,sync,no_subtree_check,no_root_squash)
 {% for node in compute_nodes %}
 /mnt/usb/{{ node.hostname }} {{ cluster_network_portion }}.0/24(rw,sync,no_subtree_check,no_root_squash)
 {% endfor %}

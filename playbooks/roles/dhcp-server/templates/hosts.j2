@@ -3,9 +3,9 @@
 ff02::1     ip6-allnodes
 ff02::2     ip6-allrouters
 
-127.0.1.1   hydra
+127.0.1.1   {{ ansible_hostname }}
 
-{{ cluster_network_portion }}.1    hydra
+{{ cluster_network_portion }}.1    {{ ansible_hostname }}
 {{ cluster_network_portion }}.254    switch
 
 {% for node in compute_nodes %}

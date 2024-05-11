@@ -1,5 +1,6 @@
 # Download the latest firmware, and create the filesystems for the compute nodes
-# Note that the download will _always_ run because of the cleanup process.
+# Note that the download will _always_ run if we update firmware, because of the
+# cleanup process.
 ---
 - name: Download and mount new firmware and fs.
   when: update_firmware|bool
@@ -23,18 +24,6 @@
         - unmount workspace
         - cleanup workspace
 
-    - name: Test DNS resolution
-      ansible.builtin.get_url:
-        url: https://icanhazip.com/
-        dest: /tmp/test_dns.txt
-    - name: Print output
-      ansible.builtin.command: cat /tmp/test_dns.txt
-      register: debug_output
-    - name: Check output
-      debug: 
-        msg: "IP from icanhazip: {{ debug_output.stdout }}"
-
-
     - name: Download latest firmware.
       become: true
       ansible.builtin.get_url:
@@ -43,27 +32,47 @@
       notify: 
         - unmount workspace
         - cleanup workspace
-    
-    - name: Unpack the downloaded firmware.
+
+    - name: Unpack downloaded firmware.
       become: true
-      ansible.builtin.shell: >-
-        xz -d /tmp/image/raspios_lite_latest.img.xz
-        kpartx -a -v /tmp/image/*.img
+      ansible.builtin.command: xz -d raspios_lite_latest.img.xz
+      args:
+        chdir: /tmp/image
+        creates: raspios_lite_latest.img
       notify: 
         - unmount workspace
         - cleanup workspace
-        
+
+    - name: Set device mappings for downloaded firmware files.
+      become: true
+      ansible.builtin.command:
+        argv: ["kpartx", "-a", "-v", "raspios_lite_latest.img"]
+      args:
+        chdir: /tmp/image
+      notify: 
+        - unmount workspace
+        - cleanup workspace
+
+    - name: Reload daemon in case fstab have been modified.
+      become: true
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+
     - name: Temporarily mount the downloaded firmware and filesystem.
       become: true
       ansible.posix.mount:
         path: "/tmp/image/{{ item.dest }}"
         src: "/dev/mapper/{{ item.src }}"
+        fstype: "{{ item.fstype }}"
         state: mounted
       loop:
         - dest: bootmnt
           src: loop0p1
+          fstype: vfat
         - dest: rootmnt
           src: loop0p2
+          fstype: ext4
+      register: tmp_fs_mounted
       notify: 
         - unmount workspace
         - cleanup workspace
@@ -71,3 +80,12 @@
 - name: Configure node filesystem
   include_tasks: create_filesystems.yml
   loop: "{{ compute_nodes }}"
+
+- name: Restart Services
+  become: true
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    state: restarted
+  loop:
+    - rpcbind
+    - nfs-server

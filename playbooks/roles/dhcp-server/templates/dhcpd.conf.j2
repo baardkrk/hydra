@@ -3,20 +3,26 @@
 ddns-update-style none;
 authoritative;
 log-facility local7;
+option option-43 code 43 = text;
+option option-66 code 66 = text;
 
 # No service will be given on this subnet
 subnet 10.13.37.0 netmask 255.255.255.0 {
+       not authoritative;
 }
 
 # The internal cluster network
 group {
-      option broadcast-address {{ cluster_network_portion }}.255;
-      option routers {{ cluster_network_portion }}.1;
-      default-lease-time 600;
-      max-lease-time 7200;
+
       option domain-name "cluster";
       option domain-name-servers 8.8.8.8, 8.8.4.4;
+      default-lease-time 600;
+      max-lease-time 7200;
+
       subnet {{ cluster_network_portion }}.0 netmask 255.255.255.0 {
+
+             option broadcast-address {{ cluster_network_portion }}.255;
+             option routers {{ cluster_network_portion }}.1;
              range {{ cluster_network_portion }}.20 {{ cluster_network_portion }}.250;
 
              # Head Node
@@ -24,7 +30,7 @@ group {
                   hardware ethernet {{ ansible_facts.eth0.macaddress }};
                   fixed-address {{ cluster_network_portion }}.1;
              }
-             
+
              {% if switch_mac is defined -%}
              # Switch
              host switch {
@@ -35,7 +41,7 @@ group {
 
              {% for node in compute_nodes -%}
              # Node {{ loop.index }}
-             host rpi{{ loop.index }} {
+             host {{ node.hostname }} {
                   option root-path "/mnt/usb/tftpboot/";
                   hardware ethernet {{ node.mac }};
                   option option-43 "Raspberry Pi Boot";
